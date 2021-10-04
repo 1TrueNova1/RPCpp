@@ -5,4 +5,6 @@ Now it supports a few simple features:
  - Registering functions, types (classes) and their methods on server
  - Remote calls to functions
  - Creation of remote objects
- - Remote calls to methods of specific remote objects 
+ - Remote calls to methods of specific remote objects
+
+RPCpp requires modern compiler supporting features of C++20.
