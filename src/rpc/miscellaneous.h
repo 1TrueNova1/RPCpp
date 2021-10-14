@@ -37,6 +37,10 @@ namespace rpc
 	};
 
 	using id_t = std::size_t;
+	using handle_t = std::uint16_t;
+
+	static id_t null_id = std::numeric_limits<id_t>::max();
+	static handle_t null_handle = std::numeric_limits<handle_t>::max();
 
 	template<typename T, typename ...Args, typename std::size_t ...Indices>
 	T* new_tuple_invoker(const std::tuple<Args...>& tuple, std::index_sequence<Indices...>)
@@ -49,18 +53,6 @@ namespace rpc
 		return new_tuple_invoker<T>(tuple, std::make_index_sequence<std::tuple_size_v<std::decay_t<decltype(tuple)>>>{});
 	}
 
-	template<typename T>
-	std::size_t sizeof_pack(const T& value)
-	{
-		return sizeof T;
-	}
-	template<typename T, typename ...Args>
-	std::size_t sizeof_pack(const T& value, const Args&... values)
-	{
-		return sizeof T + sizeof_pack(values...);
-	}
-
-
 	using opcode_t = std::uint8_t;
 	namespace opcodes
 	{
@@ -71,10 +63,21 @@ namespace rpc
 	template<typename ...Args>
 	misc::buffer<> form_packet(opcode_t opcode, Args&&... args)
 	{
-		std::size_t size = sizeof_pack(args...) + sizeof opcode_t;
+		std::size_t size = misc::sizeof_v(args...) + sizeof opcode_t;
 		misc::buffer<> packet(size);
 		packet.add(opcode);
 		packet.add(args...);
 		return packet;
 	}
+
+
+	using error_t = std::int32_t;
+
+	namespace errors
+	{
+		const error_t no_error = 0;
+		const error_t connection_failure = 1;
+		const error_t bad_request = 2;
+	}
+
 }

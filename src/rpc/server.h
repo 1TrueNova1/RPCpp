@@ -1,10 +1,11 @@
 #pragma once
 
 #include "../networking/socket.h"
-#include "rpc/miscellaneous.h"
+#include "miscellaneous.h"
 
 #include <map>
 #include <thread>
+#include <new>
 
 namespace rpc
 {
@@ -52,8 +53,8 @@ namespace rpc
 
 				unpack(args, buffer, std::make_index_sequence<std::tuple_size_v<args_types_tuple>>{});
 
-				ret_type ret_val = std::apply(std::move(f), std::move(args));
-				misc::buffer<> ret_buffer(sizeof ret_type);
+				ret_type ret_val = std::apply(f, std::move(args));
+				misc::buffer<> ret_buffer(misc::sizeof_v(ret_val));
 				ret_buffer.add(ret_val);
 				return ret_buffer;
 			};
@@ -65,7 +66,18 @@ namespace rpc
 		{
 			auto unpack_one_parameter = [counter = 0, &buffer](auto& value) mutable
 			{
-				value = misc::get<decltype(value)>((void*)buffer.data(), counter);
+				using T = std::decay_t<decltype(value)>;
+
+				if constexpr (misc::is_iterable<T>::value) {
+					using value_type = T::value_type;
+					std::size_t size = misc::get<std::size_t>(buffer.data(), counter);
+					value_type *data = static_cast<value_type*>(misc::get(buffer.data(), size, counter));
+					//creating container from buffered data
+					value = T(data, data + size / sizeof value_type);
+					delete[] data;
+				}
+				if constexpr (!misc::is_iterable<T>::value)
+					value = misc::get<T>(buffer.data(), counter);
 			};
 
 			(unpack_one_parameter(std::get<Indices>(tuple)), ...);
@@ -116,7 +128,7 @@ namespace rpc
 
 				auto caller = [&object, &method](auto... args) -> ret_type { return (object->*method)(args...); };
 				ret_type ret_val = std::apply(caller, args); 
-				misc::buffer<> ret_buffer(sizeof ret_type);
+				misc::buffer<> ret_buffer(misc::sizeof_v(ret_val));
 				ret_buffer.add(ret_val);
 				return ret_buffer;
 			};
@@ -125,7 +137,7 @@ namespace rpc
 
 		void run()
 		{
-			misc::buffer<> buffer(net::kilobyte);
+			misc::buffer<> buffer(10 * net::kilobyte);
 
 			if (socket.accept() == false) {
 				std::cout << "Something happened while accepting new client in run method of server\n";

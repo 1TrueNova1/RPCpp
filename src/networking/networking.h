@@ -15,6 +15,9 @@
 #endif
 
 #if PLATFORM == PLATFORM_WINDOWS
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <winsock2.h>
 using socket_t = SOCKET;
 
