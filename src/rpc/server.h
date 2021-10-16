@@ -9,7 +9,6 @@
 
 namespace rpc
 {
-	// TODO: add another level of abstraction for handling return type or its absense
 
 	class server
 	{
@@ -53,10 +52,7 @@ namespace rpc
 
 				unpack(args, buffer, std::make_index_sequence<std::tuple_size_v<args_types_tuple>>{});
 
-				ret_type ret_val = std::apply(f, std::move(args));
-				misc::buffer<> ret_buffer(misc::sizeof_v(ret_val));
-				ret_buffer.add(ret_val);
-				return ret_buffer;
+				return apply(f, std::move(args));
 			};
 
 			functions.emplace(func_id, std::move(lambda));
@@ -81,6 +77,28 @@ namespace rpc
 			};
 
 			(unpack_one_parameter(std::get<Indices>(tuple)), ...);
+		}
+		
+		template<typename Func, typename ...Args>
+		misc::buffer<> apply(const Func& function, Args&&... args)
+		{
+			std::function f = function;
+			using meta_info = function_meta_info<decltype(f)>;
+			using return_type = typename meta_info::return_type;
+
+			if constexpr (std::is_same_v<return_type, void>) {
+				std::apply(function, std::move(args...));
+				misc::buffer<> ret_buffer(sizeof status_t);
+				ret_buffer.add(status_codes::good);
+				return ret_buffer;
+			}
+			else {
+				return_type ret_value = std::apply(function, std::move(args...));
+				misc::buffer<> ret_buffer(sizeof status_t + misc::sizeof_v(ret_value));
+				ret_buffer.add(status_codes::good);
+				ret_buffer.add(ret_value);
+				return ret_buffer;
+			}
 		}
 
 		template<typename T, typename Ret, typename ...Args>
@@ -126,11 +144,11 @@ namespace rpc
 				class_type* object = static_cast<class_type*>(object_v);
 				assert(object != nullptr);
 
-				auto caller = [&object, &method](auto... args) -> ret_type { return (object->*method)(args...); };
-				ret_type ret_val = std::apply(caller, args); 
-				misc::buffer<> ret_buffer(misc::sizeof_v(ret_val));
-				ret_buffer.add(ret_val);
-				return ret_buffer;
+				auto caller = [&object, &method](Args... args) -> Ret { return (object->*method)(args...); };
+				//ret_type ret_val = std::apply(caller, args); 
+				//misc::buffer<> ret_buffer(misc::sizeof_v(ret_val));
+				//ret_buffer.add(ret_val);
+				return apply(caller, std::move(args));
 			};
 			methods.emplace(method_id, lambda);
 		}
@@ -154,7 +172,7 @@ namespace rpc
 					std::cout << "Something has happened with server socket while receiving client call\n";
 					int error_code = WSAGetLastError();
 					std::cout << "Error code: " << error_code << '\n';
-					continue;
+					break;
 				}
 
 				buffer.set_size(return_code);

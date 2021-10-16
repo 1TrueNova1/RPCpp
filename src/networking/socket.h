@@ -275,7 +275,7 @@ namespace net {
 				std::cout << "Error code: " << error << '\n';
 				return false;
 			}
-			std::cout << "Connected to the server\n";
+			//std::cout << "Connected to the server\n";
 			return true;
 		}
 

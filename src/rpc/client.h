@@ -4,8 +4,11 @@
 #include "../networking/socket.h"
 #include "../networking/miscellaneous.h"
 
+#include "miscellaneous.h"
 
 #include <limits>
+#include <map>
+#include <thread>
 
 namespace rpc
 {
@@ -58,7 +61,11 @@ namespace rpc
 				return misc::buffer<>();
 			}
 			buffer.clear();
-			return receive_and_return(server_id, buffer);
+
+			buffer = receive_and_return(server_id, buffer);
+			status_t status = get_call_status(buffer);
+			assert(status == status_codes::good);
+			return buffer;
 		}
 
 		template<typename ...Args>
@@ -129,7 +136,10 @@ namespace rpc
 				return misc::buffer<>();
 			}
 			buffer.clear();
-			return receive_and_return(server_id, buffer);
+			buffer = receive_and_return(server_id, buffer);
+			status_t status = get_call_status(buffer);
+			assert(status == status_codes::good);
+			return buffer;
 		}
 
 		misc::buffer<> receive_and_return(handle_t server_id, misc::buffer<>& buffer)
@@ -152,6 +162,14 @@ namespace rpc
 
 			buffer.set_size(return_value);
 			return buffer;
+		}
+
+		status_t get_call_status(misc::buffer<>& buffer)
+		{
+			status_t status_code = misc::get<status_t>(buffer.data(), 0);
+			buffer.left_shift(sizeof status_t);
+
+			return status_code;
 		}
 
 

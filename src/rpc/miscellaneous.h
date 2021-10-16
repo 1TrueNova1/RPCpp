@@ -70,6 +70,13 @@ namespace rpc
 		return packet;
 	}
 
+	using status_t = std::uint8_t;
+
+	namespace status_codes
+	{
+		const status_t good = 0;
+		const status_t bad = 1;
+	}
 
 	using error_t = std::int32_t;
 
